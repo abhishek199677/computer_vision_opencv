@@ -1,16 +1,22 @@
 import cv2
 from ultralytics import YOLO
-from playsound import playsound  # Use playsound instead of winsound for macOS
+import subprocess
+import os
+import time
 
 def main():
     # Use your actual IP camera stream URL here
-    ip_camera_url = "username/password/ipaddress:port"
-
-    
+    ip_camera_url = "rtsp://username:password@ipaddress:port/stream"
 
     cap = cv2.VideoCapture(ip_camera_url)
-    
+    if not cap.isOpened():
+        print("Error: Could not open video stream.")
+        return
+
     model = YOLO("yolov8n.pt")
+
+    # Use absolute path for alert.wav to avoid path issues
+    alert_sound = os.path.abspath("alert.wav")
     
     while True:
         ret, frame = cap.read()
@@ -20,14 +26,17 @@ def main():
         
         result = model.predict(source=frame, show=False, conf=0.5)
         results = result[0]
-        detected_frame = result[0].plot()
+        detected_frame = results.plot()
         classes = results.boxes.cls.cpu().numpy().astype(int)
+        
         if 0 in classes:
             print("person detected")
             cv2.imwrite("person.jpg", frame)
-            playsound('alert.wav')  # Use a valid sound file path
-            
-        cv2.imshow("live object detection from my CCTV feed", detected_frame)
+            # Play alert sound using afplay via subprocess (macOS)
+            subprocess.call(['afplay', alert_sound])
+            time.sleep(1)  # Prevent multiple alerts per second
+
+        cv2.imshow("Live Object Detection from CCTV Feed", detected_frame)
         
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break 
